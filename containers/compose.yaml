@@ -1,0 +1,50 @@
+name: devcontainer
+
+services:
+    base:
+        build:
+            target: base
+
+    devcontainer:
+        build:
+            target: development
+            args:
+                - GID=${GID:-1000}
+                - UID=${UID:-1000}
+                - USERNAME=${USERNAME:-dev}
+        volumes:
+          - ..:/workspace:cached
+          # Use anonymous volumes to avoid sharing host's .venv
+          # Renew volumes when you change packages with
+          # `docker compose up --renew-anon-volumes`
+          - /workspace/frontend/node_modules
+          - /workspace/backend/.venv
+
+    backend:
+        build:
+            context: ../backend/
+            dockerfile: ../containers/backend.Dockerfile
+            additional_contexts:
+                base: service:base
+
+    frontend:
+        build:
+            context: ../frontend/
+            dockerfile: ../containers/frontend.Dockerfile
+            additional_contexts:
+                base: service:base
+
+        # network_mode: service:db
+
+    # db:
+    #     image: postgres:latest
+    #     restart: unless-stopped
+    #     volumes:
+    #         - postgres-data:/var/lib/postgresql/data
+    #     environment:
+    #         POSTGRES_PASSWORD: postgres
+    #         POSTGRES_USER: postgres
+    #         POSTGRES_DB: postgres
+
+# volumes:
+#     postgres-data:
