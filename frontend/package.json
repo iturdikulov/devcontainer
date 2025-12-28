@@ -1,0 +1,17 @@
+{
+  "name": "dev_container",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "run-p type-check \"build-only {@}\" --"
+  },
+  "dependencies": {
+    "vite": "^7.3.0",
+    "vue": "^3.5.25"
+  }
+}
