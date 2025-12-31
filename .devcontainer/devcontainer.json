@@ -1,18 +1,33 @@
 {
     "name": "devcontainer",
     "dockerComposeFile": "../containers/compose.yaml",
-    "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
     "workspaceFolder": "/workspace",
+    "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
     "service": "devcontainer",
     "build": { "target": "development" },
     "containerEnv": {
         "PYTHONUNBUFFERED": "1"
     },
+    "forwardPorts": [5173, 8000],
+    // For VScode users
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "ms-python.vscode-pylance"
+            ],
+            "settings": {
+                "python.defaultInterpreterPath": "${containerWorkspaceFolder}/backend/.venv/bin/python",
+                "terminal.integrated.defaultProfile.linux": "zsh"
+            }
+        }
+    },
     "features": {},
     "mounts": [
         "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/home/dev/.ssh/id_rsa,type=bind,consistency=cached",
+        "source=node_modules,target=${containerWorkspaceFolder}/frontend/node_modules,type=volume"
     ],
-    //"postCreateCommand": "sudo apt-get install -y yadm && yadm clone --depth=1 https://github.com/iturdikulov/dev",
+    "postCreateCommand": "direnv allow {frontend,backend}/.envrc && uv sync --project backend && cd frontend && npm install",
     "remoteUser": "dev",
     "runArgs": ["--hostname=devcontainer"]
 }
