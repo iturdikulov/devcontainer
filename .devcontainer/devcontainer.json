@@ -24,8 +24,7 @@
     },
     "features": {},
     "mounts": [
-        "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/home/dev/.ssh/id_rsa,type=bind,consistency=cached",
-        "source=node_modules,target=${containerWorkspaceFolder}/frontend/node_modules,type=volume"
+        "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/home/dev/.ssh/id_rsa,type=bind,consistency=cached"
     ],
     "postCreateCommand": "direnv allow {frontend,backend}/.envrc && uv sync --project backend && cd frontend && npm install",
     "remoteUser": "dev",

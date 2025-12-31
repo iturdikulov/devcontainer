@@ -3,7 +3,7 @@
 # original: https://github.com/JetBrains/qodana-cli/blob/f2e81df1b12a5c0d9d8d4c74f2e9a8fbe0c7e2dd/dockerfiles/base/python.Dockerfile#L1
 # https://github.com/astral-sh/uv-docker-example/tree/main
 
-ARG DEBIAN_BASE_TAG="trixie-slim"
+# trixie-slim based images
 ARG UV_TAG="uv:0.9.21-trixie-slim"
 ARG NODE_TAG="25.2.1-trixie-slim"
 ARG PYTHON_TAG="3.14.2-slim-trixie"
@@ -12,7 +12,6 @@ ARG PYTHON_TAG="3.14.2-slim-trixie"
 # ==========================================
 # Fetch debian, uv, node and python layers
 # ==========================================
-FROM debian:${DEBIAN_BASE_TAG} AS base
 FROM ghcr.io/astral-sh/${UV_TAG} AS uv_source
 FROM node:${NODE_TAG} AS node_source
 
@@ -30,7 +29,7 @@ COPY --from=uv_source /usr/local/bin/uv /usr/local/bin/uvx /usr/local/bin/
 
 
 # ==========================================
-# Development stage
+# Development container
 # ==========================================
 FROM python_source AS development
 
