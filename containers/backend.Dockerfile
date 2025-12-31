@@ -1,21 +1,23 @@
-FROM base AS uv_builder
+# Based on:
+# https://github.com/astral-sh/uv-docker-example/blob/main/multistage.Dockerfile
+FROM python_source AS uv_builder
+
+COPY --from=uv_source /usr/local/bin/uv /usr/local/bin/uvx /usr/local/bin/
+
+WORKDIR /app
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     uv sync --locked --no-install-project
-
 COPY . /app/
-
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked
 
-FROM debian:trixie-slim
+FROM python_source
+
 # Setup a non-root user
 RUN groupadd --system --gid 999 nonroot \
  && useradd --system --gid 999 --uid 999 --create-home nonroot
-
-# Copy the Python version
-COPY --from=uv_builder /python /python
 
 # Copy the backend application from the builder
 COPY --from=uv_builder --chown=nonroot:nonroot /app /app

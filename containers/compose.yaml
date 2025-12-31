@@ -1,9 +1,17 @@
 name: devcontainer
 
 services:
-    base:
+    uv_source:
         build:
-            target: base
+            target: uv_source
+
+    node_source:
+        build:
+            target: node_source
+
+    python_source:
+        build:
+            target: python_source
 
     devcontainer:
         build:
@@ -25,14 +33,15 @@ services:
             context: ../backend/
             dockerfile: ../containers/backend.Dockerfile
             additional_contexts:
-                base: service:base
+                python_source: service:python_source
+                uv_source: service:uv_source
 
     frontend:
         build:
             context: ../frontend/
             dockerfile: ../containers/frontend.Dockerfile
             additional_contexts:
-                base: service:base
+                node_source: service:node_source
 
         # network_mode: service:db
 

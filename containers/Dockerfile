@@ -1,116 +1,97 @@
-# based on
-# https://github.com/astral-sh/uv-docker-example/blob/main/multistage.Dockerfile
-FROM debian:trixie-slim AS base
+# Based on:
+# https://github.com/JetBrains/qodana-cli/blob/main/dockerfiles/base/python.Dockerfile
+# original: https://github.com/JetBrains/qodana-cli/blob/f2e81df1b12a5c0d9d8d4c74f2e9a8fbe0c7e2dd/dockerfiles/base/python.Dockerfile#L1
+# https://github.com/astral-sh/uv-docker-example/tree/main
 
-WORKDIR /app
+ARG DEBIAN_BASE_TAG="trixie-slim"
+ARG UV_TAG="uv:0.9.21-trixie-slim"
+ARG NODE_TAG="25.2.1-trixie-slim"
+ARG PYTHON_TAG="3.14.2-slim-trixie"
 
-# UV
-# ----
-ENV UV_VERSION=0.9.18
-ENV PYTHON_VERSION=3.14
-ENV UV_INSTALL_DIR=/usr/local/bin
 
-# The installer requires curl (and certificates) to download the release archive
-RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates
+# ==========================================
+# Fetch debian, uv, node and python layers
+# ==========================================
+FROM debian:${DEBIAN_BASE_TAG} AS base
+FROM ghcr.io/astral-sh/${UV_TAG} AS uv_source
+FROM node:${NODE_TAG} AS node_source
 
-# Download the installer
-ADD https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/uv-installer.sh /uv-installer.sh
-
-# Verify installer
-# to get sha256sum run `UV_VERSION=<VERSION> curl -fsSL https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/uv-installer.sh | sha257sum`
-RUN echo "e27424708d1ac59cfc94e3f540a111f2edbb37bc8164febce8ee7fa5d5505c71  /uv-installer.sh" | sha256sum -c -
-
-# Run the installer then remove it
-RUN sh /uv-installer.sh && rm /uv-installer.sh
-
+FROM python:${PYTHON_TAG} AS python_source
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
+# Use the system Python interpreter
+# https://docs.astral.sh/uv/reference/environment/#uv_python_downloads
+ENV UV_PYTHON_DOWNLOADS="manual"
+# Avoid prompts
+ENV DEBIAN_FRONTEND noninteractive
 
-# Omit development dependencies
-ENV UV_NO_DEV=1
-
-# Configure the Python directory so it is consistent
-ENV UV_PYTHON_INSTALL_DIR=/python
-
-# Only use the managed Python version
-ENV UV_PYTHON_PREFERENCE=only-managed
-
-# Install Python before the project for caching
-RUN uv python install ${PYTHON_VERSION}
-
-# NODE
-# ----
-# based on https://github.com/nodejs/docker-node/blob/main/25/trixie-slim/Dockerfile
-ENV NODE_VERSION=25.2.1
-ENV NODE_BASE_URL=https://mirror.yandex.ru/mirrors/nodejs.org/dist
-
-RUN ARCH= OPENSSL_ARCH= && dpkgArch="$(dpkg --print-architecture)" \
-    && case "${dpkgArch##*-}" in \
-      amd64) ARCH='x64' OPENSSL_ARCH='linux-x86_64';; \
-      ppc64el) ARCH='ppc64le' OPENSSL_ARCH='linux-ppc64le';; \
-      s390x) ARCH='s390x' OPENSSL_ARCH='linux*-s390x';; \
-      arm64) ARCH='arm64' OPENSSL_ARCH='linux-aarch64';; \
-      armhf) ARCH='armv7l' OPENSSL_ARCH='linux-armv4';; \
-      i386) ARCH='x86' OPENSSL_ARCH='linux-elf';; \
-      *) echo "unsupported architecture"; exit 1 ;; \
-    esac \
-    && set -ex \
-    # libatomic1 for arm
-    && apt-get update && apt-get install -y ca-certificates curl wget gnupg dirmngr xz-utils libatomic1 --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/* \
-    # use pre-existing gpg directory, see https://github.com/nodejs/docker-node/pull/1895#issuecomment-1550389150
-    && export GNUPGHOME="$(mktemp -d)" \
-    # gpg keys listed at https://github.com/nodejs/node#release-keys
-    && for key in \
-      5BE8A3F6C8A5C01D106C0AD820B1A390B168D356 \
-      DD792F5973C6DE52C432CBDAC77ABFA00DDBF2B7 \
-      CC68F5A3106FF448322E48ED27F5E38D5B0A215F \
-      8FCCA13FEF1D0C2E91008E09770F7A9A5AE15600 \
-      890C08DB8579162FEE0DF9DB8BEAB4DFCF555EF4 \
-      C82FA3AE1CBEDC6BE46B9360C43CEC45C17AB93C \
-      108F52B48DB57BB0CC439B2997B01419BD92F80A \
-      A363A499291CBBC940DD62E41F10027AF002F8B0 \
-    ; do \
-      { gpg --batch --keyserver hkps://keys.openpgp.org --recv-keys "$key" && gpg --batch --fingerprint "$key"; } || \
-      { gpg --batch --keyserver keyserver.ubuntu.com --recv-keys "$key" && gpg --batch --fingerprint "$key"; } ; \
-    done \
-    && curl -fsSLO --compressed "${NODE_BASE_URL}/v$NODE_VERSION/node-v$NODE_VERSION-linux-$ARCH.tar.xz" \
-    && curl -fsSLO --compressed "${NODE_BASE_URL}/v$NODE_VERSION/SHASUMS256.txt.asc" \
-    && gpg --batch --decrypt --output SHASUMS256.txt SHASUMS256.txt.asc \
-    && gpgconf --kill all \
-    && rm -rf "$GNUPGHOME" \
-    && grep " node-v$NODE_VERSION-linux-$ARCH.tar.xz\$" SHASUMS256.txt | sha256sum -c - \
-    && tar -xJf "node-v$NODE_VERSION-linux-$ARCH.tar.xz" -C /usr/local --strip-components=1 --no-same-owner \
-    && rm "node-v$NODE_VERSION-linux-$ARCH.tar.xz" SHASUMS256.txt.asc SHASUMS256.txt \
-    # Remove unused OpenSSL headers to save ~34MB. See this NodeJS issue: https://github.com/nodejs/node/issues/46451
-    && find /usr/local/include/node/openssl/archs -mindepth 1 -maxdepth 1 ! -name "$OPENSSL_ARCH" -exec rm -rf {} \; \
-    && apt-mark auto '.*' > /dev/null \
-    && find /usr/local -type f -executable -exec ldd '{}' ';' \
-      | awk '/=>/ { so = $(NF-1); if (index(so, "/usr/local/") == 1) { next }; gsub("^/(usr/)?", "", so); print so }' \
-      | sort -u \
-      | xargs -r dpkg-query --search \
-      | cut -d: -f1 \
-      | sort -u \
-      | xargs -r apt-mark manual \
-    && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
-    && ln -s /usr/local/bin/node /usr/local/bin/nodejs \
-    # smoke tests
-    && node --version \
-    && npm --version \
-    && rm -rf /tmp/*
+# Install uv
+# ==========================================
+COPY --from=uv_source /usr/local/bin/uv /usr/local/bin/uvx /usr/local/bin/
 
 
-# There is specific pull issue with additional_contexts, devcontainers and own dockerfile
-# so I placed devcontainer setup here
-FROM base AS development
+# ==========================================
+# Development stage
+# ==========================================
+FROM python_source AS development
 
 ARG UID=1000
 ARG GID=1000
 ARG USERNAME=dev
 
-# Basic dependencies
-RUN apt-get update && \
-    apt-get install -y sudo wget iputils-ping htop git fzf rsync gnupg gpg tmux ripgrep zsh zsh-autosuggestions \
-    && apt-get clean
+# Install Node.js, npm, yarn (Copying the whole /usr/local structure works best for Node)
+# ==========================================
+ENV ESLINT_VERSION="9.31.0"
+ENV PNPM_VERSION="10.13.1"
+
+ENV PATH="/opt/yarn/bin:$PATH"
+ENV SKIP_YARN_COREPACK_CHECK=0
+COPY --from=node_source /usr/local/bin/node /usr/local/bin/
+COPY --from=node_source /usr/local/include/node /usr/local/include/node
+COPY --from=node_source /usr/local/lib/node_modules /usr/local/lib/node_modules
+COPY --from=node_source /opt/yarn-* /opt/yarn/
+
+RUN apt-get update && apt-get install -y xz-utils libatomic1 --no-install-recommends && \
+    ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && \
+    ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx && \
+    ln -s /usr/local/lib/node_modules/corepack/dist/corepack.js /usr/local/bin/corepack && \
+    node --version && \
+    npm --version && \
+    yarn --version && \
+    npm install -g eslint@$ESLINT_VERSION pnpm@$PNPM_VERSION
+
+# Install base dependencies and configure the environment
+# ==========================================
+# https://docs.docker.com/reference/dockerfile/#example-cache-apt-packages
+RUN rm -f /etc/apt/apt.conf.d/docker-clean; echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && \
+    apt-get --no-install-recommends install -y \
+    bat \
+    coreutils \
+    curl \
+    fd-find \
+    fzf \
+    git \
+    gnupg \
+    gpg \
+    htop \
+    iputils-ping \
+    jq \
+    ncdu \
+    ripgrep \
+    rsync \
+    sudo \
+    tmux \
+    unzip \
+    zip \
+    zoxide \
+    zsh \
+    zsh-autosuggestions \
+    nano \
+    micro \
+    vim \
+    direnv
 
 # Setup a non-root user
 RUN groupadd --system --gid 1000 dev \
