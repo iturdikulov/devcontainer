@@ -1,3 +1,5 @@
+## Using with devpod
+
 Create a container
 
     devpod up . --ide none
@@ -10,8 +12,7 @@ View a list of all our environments
 
     devpod ls
 
+Connect
 
-Let's connect
-
-    ssh debian13.devpod
+    ssh devcontainer.devpod
 
